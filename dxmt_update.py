@@ -1,5 +1,6 @@
 # flake8: noqa
 import os
+import sys
 import shutil
 from pathlib import Path
 from datetime import datetime
@@ -22,6 +23,7 @@ def find_file_in_subfolders(src_folder, filename):
     return None
 
 def move_files(src_folder, wine_folder, wineprefix_folder):
+    # as mentioned in https://github.com/3Shain/dxmt/wiki/DXMT-Installation-Guide-for-Geeks#movingreplacing-files
     files_to_move = {
         "winemetal.so": [os.path.join(wine_folder, "lib/wine/x86_64-unix/winemetal.so")],
         "winemetal.dll": [
@@ -39,6 +41,10 @@ def move_files(src_folder, wine_folder, wineprefix_folder):
             for dest_file in dest_files:
                 dest_dir = os.path.dirname(dest_file)
                 if os.path.exists(dest_dir):
+                    # compare the file hash, if different, backup and overwrite
+                    if os.system(f"cmp -s {src_file} {dest_file}") == 0:
+                            print(f"{src_file} and {dest_file} are the same, skip")
+                            continue
                     backup_and_overwrite(src_file, dest_file)
                     print(f"{src_file} ==> {dest_file}")
                 else:
@@ -48,6 +54,8 @@ def move_files(src_folder, wine_folder, wineprefix_folder):
 
 def choose_items(item_list: Iterable[Path], item_name: str) -> Path:
     item_list = [i for i in item_list if not i.match(r'.*')]
+    if len(item_list) == 0:
+        raise ValueError(f"No {item_name} found")
     if len(item_list) == 1:
         return item_list[0]
     print(f"{item_name.capitalize()}s:")
@@ -59,7 +67,12 @@ def choose_items(item_list: Iterable[Path], item_name: str) -> Path:
 
 if __name__ == "__main__":
     # search src_folder, src_folder should contains the dir: $(src_folder)/src/dxmt/
-    src_folder = choose_items(Path.cwd().glob('**/src/dxmt/'), "dxmt folder").parent
+    if sys.argv[1:]:
+        cur_folder = Path(sys.argv[1])
+    else:
+        cur_folder = Path()
+    cur_folder = cur_folder.relative_to(".")
+    src_folder = choose_items(Path.cwd().glob(f'{cur_folder}/**/src/dxmt/'), "dxmt folder").parent
     wine_folder = choose_items(Path("/Applications").glob('CrossOver*/Contents/SharedSupport/CrossOver/'), "wine folder")
     wineprefix_folder = choose_items(Path("/Users/qzhu/CXPBottles/").glob('*'), "bottle")
     
